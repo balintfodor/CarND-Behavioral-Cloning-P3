@@ -52,9 +52,9 @@ def import_dataframe(df, csv_dir, args):
         targets = np.array(targets, ndmin=2)
         targets = np.repeat(targets, 3, axis=0)
         # left image -> should turn right
-        targets[1, 3] = np.minimum(targets[2, 3] + args.steering_compensation, 1.0)
+        targets[1, 0] = np.minimum(targets[1, 0] + args.steering_compensation, 1.0)
         # right image -> should turn left
-        targets[2, 3] = np.maximum(targets[1, 3] - args.steering_compensation, -1.0)
+        targets[2, 0] = np.maximum(targets[2, 0] - args.steering_compensation, -1.0)
         targets[:, 3] /= SPEED_DIVIDER
         for i, file_name in enumerate(inputs):
             data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=False))
