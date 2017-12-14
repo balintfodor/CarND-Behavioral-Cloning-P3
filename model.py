@@ -1,5 +1,5 @@
 import argparse
-import glob
+import glob, os
 from tqdm import tqdm
 
 import numpy as np
@@ -32,9 +32,10 @@ def find_csv_files(search_path):
 
 def image_path(csv_file_dir, abs_image_path_in_csv):
     '''generates an image path relative to its descriptor csv'''
-    return str(csv_file_dir + '/IMG/' + abs_image_path_in_csv.split('/')[-1])
+    path = os.path.join(csv_file_dir, 'IMG', os.path.basename(abs_image_path_in_csv))
+    return str(os.path.realpath(path))
 
-def import_dataframe(df, args):
+def import_dataframe(df, csv_dir, args):
     '''loads, formats and scales the data given in a dataframe'''
     data_x_list = []
     data_y_list = []
@@ -47,7 +48,7 @@ def import_dataframe(df, args):
         targets[2, 3] = np.minimum(targets[2, 3] + args.steering_compensation, 1.0)
         targets[:, 3] /= SPEED_DIVIDER
         for i, file_name in enumerate(inputs):
-            data_x_list.append(imread(file_name, as_grey=True))
+            data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=True))
             data_y_list.append(targets[i])
 
     data_x = np.array(data_x_list)
@@ -64,7 +65,8 @@ def import_data(search_path, args):
         df = pd.read_csv(file, header=None)
         if args.test:
             df = df.head(256)
-        data_x_table, data_y_table = import_dataframe(df, args)
+        csv_dir = os.path.dirname(os.path.realpath(file))
+        data_x_table, data_y_table = import_dataframe(df, csv_dir, args)
         data_x_table_list.append(data_x_table)
         data_y_table_list.append(data_y_table)
 
