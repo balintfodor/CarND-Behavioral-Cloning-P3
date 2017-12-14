@@ -56,6 +56,8 @@ def import_dataframe(df, csv_dir, args):
         # right image -> should turn left
         targets[2, 0] = np.maximum(targets[2, 0] - args.steering_compensation, -1.0)
         targets[:, 3] /= SPEED_DIVIDER
+        # keep only the steering for now
+        targets = targets[:, [0]]
         for i, file_name in enumerate(inputs):
             data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=False))
             data_y_list.append(targets[i])
@@ -99,7 +101,7 @@ def build_simple_model(args):
     model.add(Lambda(lambda x: 1.0/255.0 * x, input_shape=(160, 320, 3)))
     model.add(Flatten())
     model.add(Dense(100, activation='relu'))
-    model.add(Dense(4))
+    model.add(Dense(1))
     sgd = SGD(lr=args.learning_rate)
     model.compile(optimizer=sgd, loss='mean_squared_error', metrics=['accuracy'])
     return model
@@ -150,8 +152,9 @@ def build_model(args):
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
 
-    top = Dense(4)(top)
-    predictions = Activation('sigmoid')(top)
+    top = Dense(1)(top)
+    #top = Activation('sigmoid')(top)
+    predictions = top
 
     model = Model(inputs=inputs, outputs=predictions)
 
