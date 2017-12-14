@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--out', type=str, nargs='?', default='model.h5')
     parser.add_argument('--learning_rate', type=float, nargs='?', default=0.01)
     parser.add_argument('--batch_size', type=int, nargs='?', default=256)
-    parser.add_argument('--max_epochs', type=int, nargs='?', default=1000)
+    parser.add_argument('--epochs', type=int, nargs='?', default=100)
     parser.add_argument('--steering_compensation', type=float, nargs='?', default=0.2)
     parser.add_argument('--seed', type=int, nargs='?', default=42)
     parser.add_argument('--test', action='store_true')
@@ -87,16 +87,19 @@ def main():
     X, y = import_data(args.search_path, args)
     X_train, X_val, y_train, y_val = \
         train_test_split(X, y,
-        train_size=0.7,
-        test_size=0.3,
-        shuffle=True,
-        random_state=args.seed)
+                         train_size=0.7,
+                         test_size=0.3,
+                         shuffle=True,
+                         random_state=args.seed)
 
     model = build_simple_model(args)
     model.fit(X_train, y_train,
-        batch_size=args.batch_size,
-        epochs=args.max_epochs,
-        validation_data=(X_val, y_val))
+              batch_size=args.batch_size,
+              epochs=args.epochs,
+              validation_data=(X_val, y_val))
+
+    model.save(args.out)
+    
 
 if __name__ == "__main__":
     main()
