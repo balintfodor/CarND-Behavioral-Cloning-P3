@@ -13,7 +13,7 @@ from keras.layers import Dense, Flatten, Lambda, Dropout, BatchNormalization, Cr
 from keras.optimizers import SGD, Adam
 from keras.applications.mobilenet import MobileNet
 from keras.applications.xception import Xception
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils import plot_model
 
 SPEED_DIVIDER = 30.0
@@ -90,22 +90,28 @@ def build_simple_model(args):
     model.compile(optimizer=sgd, loss='mean_squared_error', metrics=['accuracy'])
     return model
 
+def scale_image(x):
+    import tensorflow as tf
+    IMAGE_SCALE_FACTOR = 1.0 / 255.0
+    return x * IMAGE_SCALE_FACTOR
+
 def build_model(args):
     '''builds the advanced model'''
     inputs = Input(shape=(160, 320, 3))
-    inputs_scaled = Lambda(lambda x: 1.0/255.0 * x)(inputs)
+    inputs_scaled = Lambda(scale_image)(inputs)
     
     sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
     sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
 
-    # highly discouraged
+    # highly discouraged, but I had an SSL verification error 
+    # when tried to download the model
     import ssl
     ssl._create_default_https_context = ssl._create_unverified_context
 
     conv_model = MobileNet(include_top=False, input_shape=(160, 160, 3))
     for layer in conv_model.layers:
         layer.trainable = False
-    
+
     conv_out_1 = conv_model(sub_input_1)
     conv_out_2 = conv_model(sub_input_2)
 
@@ -124,7 +130,7 @@ def build_model(args):
     top = Dropout(0.02)(top)
     top = Dense(32, activation='relu')(top)
     top = BatchNormalization()(top)
-    
+
     predictions = Dense(4)(top)
 
     model = Model(inputs=inputs, outputs=predictions)
@@ -149,14 +155,12 @@ def main():
 
     model = build_model(args)
     early_stopping = EarlyStopping(monitor='val_loss', patience=3)
+    checkpoint = ModelCheckpoint(args.out, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
     model.fit(X_train, y_train,
               batch_size=args.batch_size,
               epochs=args.epochs,
               validation_data=(X_val, y_val),
-              callbacks=[early_stopping])
-
-    model.save(args.out)
-    
+              callbacks=[early_stopping, checkpoint])    
 
 if __name__ == "__main__":
     main()
