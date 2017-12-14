@@ -8,7 +8,7 @@ from skimage.io import imread
 from sklearn.model_selection import train_test_split
 
 from keras.models import Sequential
-from keras.layers import Dense, Flatten
+from keras.layers import Dense, Flatten, Lambda
 from keras.optimizers import SGD, Adam
 
 SPEED_DIVIDER = 30.0
@@ -48,7 +48,7 @@ def import_dataframe(df, csv_dir, args):
         targets[2, 3] = np.minimum(targets[2, 3] + args.steering_compensation, 1.0)
         targets[:, 3] /= SPEED_DIVIDER
         for i, file_name in enumerate(inputs):
-            data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=True))
+            data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=False))
             data_y_list.append(targets[i])
 
     data_x = np.array(data_x_list)
@@ -77,12 +77,17 @@ def import_data(search_path, args):
 def build_simple_model(args):
     '''builds a basic model for test functionality'''
     model = Sequential()
-    model.add(Flatten(input_shape=(160, 320, )))
+    model.add(Lambda(lambda x: 1.0/255.0 * x, input_shape=(160, 320, 3)))
+    model.add(Flatten())
     model.add(Dense(100, activation='relu'))
     model.add(Dense(4))
     sgd = SGD(lr=args.learning_rate)
     model.compile(optimizer=sgd, loss='mean_squared_error', metrics=['accuracy'])
     return model
+
+def build_model(args):
+    '''builds the advanced model'''
+    pass
 
 def main():
     args = parse_args()
