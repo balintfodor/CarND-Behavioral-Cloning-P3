@@ -7,9 +7,14 @@ import pandas as pd
 from skimage.io import imread
 from sklearn.model_selection import train_test_split
 
-from keras.models import Sequential
-from keras.layers import Dense, Flatten, Lambda
+import keras
+from keras.models import Sequential, Model
+from keras.layers import Dense, Flatten, Lambda, Dropout, BatchNormalization, Cropping2D, Concatenate, Input, Conv2D
 from keras.optimizers import SGD, Adam
+from keras.applications.mobilenet import MobileNet
+from keras.applications.xception import Xception
+from keras.callbacks import EarlyStopping
+from keras.utils import plot_model
 
 SPEED_DIVIDER = 30.0
 
@@ -64,7 +69,7 @@ def import_data(search_path, args):
         print('processing {}'.format(file))
         df = pd.read_csv(file, header=None)
         if args.test:
-            df = df.head(256)
+            df = df.head(64)
         csv_dir = os.path.dirname(os.path.realpath(file))
         data_x_table, data_y_table = import_dataframe(df, csv_dir, args)
         data_x_table_list.append(data_x_table)
@@ -87,7 +92,50 @@ def build_simple_model(args):
 
 def build_model(args):
     '''builds the advanced model'''
-    pass
+    inputs = Input(shape=(160, 320, 3))
+    inputs_scaled = Lambda(lambda x: 1.0/255.0 * x)(inputs)
+    
+    sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
+    sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
+
+    # highly discouraged
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
+
+    conv_model = MobileNet(include_top=False, input_shape=(160, 160, 3))
+    for layer in conv_model.layers:
+        layer.trainable = False
+    
+    conv_out_1 = conv_model(sub_input_1)
+    conv_out_2 = conv_model(sub_input_2)
+
+    merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
+
+    top = Dropout(0.2)(merged_conv)
+    top = Conv2D(filters=256, kernel_size=(1, 1), activation='relu')(top)
+    top = Conv2D(filters=64, kernel_size=(1, 1), activation='relu')(top)
+    top = BatchNormalization()(top)
+
+    top = Flatten()(top)
+    top = Dropout(0.08)(top)
+    top = Dense(256, activation='relu')(top)
+    top = BatchNormalization()(top)
+
+    top = Dropout(0.02)(top)
+    top = Dense(32, activation='relu')(top)
+    top = BatchNormalization()(top)
+    
+    predictions = Dense(4)(top)
+
+    model = Model(inputs=inputs, outputs=predictions)
+
+    adam = Adam(lr=args.learning_rate)
+    model.compile(optimizer=adam, loss='mean_squared_error', metrics=['accuracy'])
+
+    plot_model(model, to_file='model.png')
+    model.summary()
+
+    return model
 
 def main():
     args = parse_args()
@@ -99,11 +147,13 @@ def main():
                          shuffle=True,
                          random_state=args.seed)
 
-    model = build_simple_model(args)
+    model = build_model(args)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=3)
     model.fit(X_train, y_train,
               batch_size=args.batch_size,
               epochs=args.epochs,
-              validation_data=(X_val, y_val))
+              validation_data=(X_val, y_val),
+              callbacks=[early_stopping])
 
     model.save(args.out)
     
