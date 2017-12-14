@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, nargs='?', default=42)
     parser.add_argument('--dropout', type=float, nargs='?', default=0.2)
     parser.add_argument('--test', action='store_true')
+    parser.add_argument('--plot_model', action='store_true')
     return parser.parse_args()
 
 def find_csv_files(search_path):
@@ -50,8 +51,10 @@ def import_dataframe(df, csv_dir, args):
         targets = row[1][3:7].values
         targets = np.array(targets, ndmin=2)
         targets = np.repeat(targets, 3, axis=0)
-        targets[1, 3] = np.maximum(targets[1, 3] - args.steering_compensation, -1.0)
-        targets[2, 3] = np.minimum(targets[2, 3] + args.steering_compensation, 1.0)
+        # left image -> should turn right
+        targets[1, 3] = np.minimum(targets[2, 3] + args.steering_compensation, 1.0)
+        # right image -> should turn left
+        targets[2, 3] = np.maximum(targets[1, 3] - args.steering_compensation, -1.0)
         targets[:, 3] /= SPEED_DIVIDER
         for i, file_name in enumerate(inputs):
             data_x_list.append(imread(image_path(csv_dir, file_name), as_grey=False))
@@ -155,7 +158,8 @@ def build_model(args):
     adam = Adam(lr=args.learning_rate)
     model.compile(optimizer=adam, loss='mean_squared_error', metrics=['accuracy'])
 
-    plot_model(model, to_file='model.png')
+    if args.plot_model:
+        plot_model(model, to_file='model.png')
     model.summary()
 
     return model
