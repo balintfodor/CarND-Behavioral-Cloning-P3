@@ -116,8 +116,13 @@ def build_model(args):
     inputs = Input(shape=(160, 320, 3))
     inputs_scaled = Lambda(scale_image)(inputs)
 
-    sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
-    sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
+    # sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
+    # sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
+
+    sub_input_1 = Cropping2D(cropping=((60, 20), (0, 160)))(inputs_scaled)
+    sub_input_2 = Cropping2D(cropping=((60, 20), (160, 0)))(inputs_scaled)
+
+    merged_sub_inputs = keras.layers.concatenate([sub_input_1, sub_input_2], axis=1)
 
     # highly discouraged, but I had an SSL verification error
     # when tried to download the keras.application model
@@ -128,10 +133,11 @@ def build_model(args):
     for layer in conv_model.layers:
         layer.trainable = False
 
-    conv_out_1 = conv_model(sub_input_1)
-    conv_out_2 = conv_model(sub_input_2)
+    # conv_out_1 = conv_model(sub_input_1)
+    # conv_out_2 = conv_model(sub_input_2)
 
-    merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
+    # merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
+    merged_conv = conv_model(merged_sub_inputs)
 
     top = merged_conv
     top = Dropout(args.dropout)(top)
@@ -153,7 +159,7 @@ def build_model(args):
     top = Activation('relu')(top)
 
     top = Dense(1)(top)
-    #top = Activation('sigmoid')(top)
+    top = Activation('sigmoid')(top)
     predictions = top
 
     model = Model(inputs=inputs, outputs=predictions)
