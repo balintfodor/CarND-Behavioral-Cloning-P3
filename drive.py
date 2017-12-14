@@ -16,7 +16,7 @@ from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
 
-import keras.applications.mobilenet
+# import keras.applications.resnet50
 import tensorflow as tf
 
 sio = socketio.Server()
@@ -123,9 +123,10 @@ if __name__ == '__main__':
         print('You are using Keras version ', keras_version,
               ', but the model was built using ', model_version)
 
-    custom_objects = {'tf': tf,
-        'relu6': keras.applications.mobilenet.relu6,
-        'DepthwiseConv2D': keras.applications.mobilenet.DepthwiseConv2D}
+    custom_objects = {}
+    # custom_objects = {'tf': tf,
+        # 'relu6': keras.applications.mobilenet.relu6,
+        # 'DepthwiseConv2D': keras.applications.mobilenet.DepthwiseConv2D}
     model = load_model(args.model, custom_objects=custom_objects)
 
     if args.image_folder != '':
