@@ -9,9 +9,10 @@ from sklearn.model_selection import train_test_split
 
 import keras
 from keras.models import Sequential, Model
-from keras.layers import Dense, Flatten, Lambda, Dropout, BatchNormalization, Cropping2D, Concatenate, Input, Conv2D
+from keras.layers import Dense, Flatten, Lambda, Dropout, BatchNormalization, Cropping2D, Concatenate, Input, Conv2D, Activation
 from keras.optimizers import SGD, Adam
-from keras.applications.inception_v3 import InceptionV3
+from keras.applications.mobilenet import MobileNet
+from keras.applications.xception import Xception
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils import plot_model
 
@@ -99,40 +100,41 @@ def build_model(args):
     inputs = Input(shape=(160, 320, 3))
     inputs_scaled = Lambda(scale_image)(inputs)
     
-    # sub_input_1 = Cropping2D(cropping=((0, 0), (0, 240)))(inputs_scaled)
-    # sub_input_2 = Cropping2D(cropping=((0, 0), (80, 160)))(inputs_scaled)
-    # sub_input_3 = Cropping2D(cropping=((0, 0), (160, 80)))(inputs_scaled)
-    # sub_input_4 = Cropping2D(cropping=((0, 0), (240, 0)))(inputs_scaled)
+    sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
+    sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
 
     # highly discouraged, but I had an SSL verification error 
-    # when tried to download the model
-    import ssl
-    ssl._create_default_https_context = ssl._create_unverified_context
+    # when tried to download the keras.application model
+    # import ssl
+    # ssl._create_default_https_context = ssl._create_unverified_context
 
-    conv_model = InceptionV3(include_top=False, input_shape=(160, 320, 3))
+    conv_model = MobileNet(include_top=False, input_shape=(160, 160, 3))
     for layer in conv_model.layers:
         layer.trainable = False
 
-    # conv_out_1 = conv_model(sub_input_1)
-    # conv_out_2 = conv_model(sub_input_2)
+    conv_out_1 = conv_model(sub_input_1)
+    conv_out_2 = conv_model(sub_input_2)
 
-    # merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
+    merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
 
-    merged_conv = conv_model(inputs_scaled)
+    top = merged_conv
+    top = Dropout(0.5)(top)
 
-    top = Dropout(0.2)(merged_conv)
-    top = Conv2D(filters=256, kernel_size=(1, 1), activation='relu')(top)
-    top = Conv2D(filters=64, kernel_size=(1, 1), activation='relu')(top)
+    top = Conv2D(filters=256, kernel_size=(1, 1))(top)
     top = BatchNormalization()(top)
+    top = Activation('relu')(top)
+    top = Dropout(0.5)(top)
 
     top = Flatten()(top)
-    top = Dropout(0.08)(top)
-    top = Dense(256, activation='relu')(top)
-    top = BatchNormalization()(top)
 
-    top = Dropout(0.02)(top)
-    top = Dense(32, activation='relu')(top)
+    top = Dense(256)(top)
     top = BatchNormalization()(top)
+    top = Activation('relu')(top)
+    top = Dropout(0.5)(top)
+
+    top = Dense(64)(top)
+    top = BatchNormalization()(top)
+    top = Activation('relu')(top)
 
     predictions = Dense(4)(top)
 
