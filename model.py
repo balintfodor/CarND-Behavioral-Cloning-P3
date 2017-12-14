@@ -28,6 +28,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, nargs='?', default=100)
     parser.add_argument('--steering_compensation', type=float, nargs='?', default=0.2)
     parser.add_argument('--seed', type=int, nargs='?', default=42)
+    parser.add_argument('--dropout', type=float, nargs='?', default=0.2)
     parser.add_argument('--test', action='store_true')
     return parser.parse_args()
 
@@ -69,7 +70,7 @@ def import_data(search_path, args):
         print('processing {}'.format(file))
         df = pd.read_csv(file, header=None)
         if args.test:
-            df = df.head(64)
+            df = df.head(32)
         csv_dir = os.path.dirname(os.path.realpath(file))
         data_x_table, data_y_table = import_dataframe(df, csv_dir, args)
         data_x_table_list.append(data_x_table)
@@ -78,6 +79,16 @@ def import_data(search_path, args):
     data_x = np.vstack(data_x_table_list)
     data_y = np.vstack(data_y_table_list)
     return data_x, data_y
+
+def append_mirrored_data(data_x, data_y):
+    '''flipping the images with its steering value to populate the dataset'''
+    mirrored_data_x = np.copy(data_x)
+    print('adding flipped images')
+    for i in tqdm(range(mirrored_data_x.shape[0]), total=mirrored_data_x.shape[0]):
+        mirrored_data_x[i] = np.flip(mirrored_data_x[i], axis=1)
+    mirrored_data_y = np.copy(data_y)
+    mirrored_data_y[:, 0] *= -1.0
+    return np.vstack((data_x, mirrored_data_x)), np.vstack((data_y, mirrored_data_y))
 
 def build_simple_model(args):
     '''builds a basic model for test functionality'''
@@ -99,11 +110,11 @@ def build_model(args):
     '''builds the advanced model'''
     inputs = Input(shape=(160, 320, 3))
     inputs_scaled = Lambda(scale_image)(inputs)
-    
+
     sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
     sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
 
-    # highly discouraged, but I had an SSL verification error 
+    # highly discouraged, but I had an SSL verification error
     # when tried to download the keras.application model
     # import ssl
     # ssl._create_default_https_context = ssl._create_unverified_context
@@ -118,25 +129,26 @@ def build_model(args):
     merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
 
     top = merged_conv
-    top = Dropout(0.5)(top)
+    top = Dropout(args.dropout)(top)
 
     top = Conv2D(filters=256, kernel_size=(1, 1))(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
-    top = Dropout(0.5)(top)
+    top = Dropout(args.dropout)(top)
 
     top = Flatten()(top)
 
     top = Dense(256)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
-    top = Dropout(0.5)(top)
+    top = Dropout(args.dropout)(top)
 
     top = Dense(64)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
 
-    predictions = Dense(4)(top)
+    top = Dense(4)(top)
+    predictions = Activation('sigmoid')(top)
 
     model = Model(inputs=inputs, outputs=predictions)
 
@@ -151,6 +163,7 @@ def build_model(args):
 def main():
     args = parse_args()
     X, y = import_data(args.search_path, args)
+    X, y = append_mirrored_data(X, y)
     X_train, X_val, y_train, y_val = \
         train_test_split(X, y,
                          train_size=0.7,
@@ -160,12 +173,16 @@ def main():
 
     model = build_model(args)
     early_stopping = EarlyStopping(monitor='val_loss', patience=3)
-    checkpoint = ModelCheckpoint(args.out, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+    checkpoint = ModelCheckpoint(args.out,
+                                 monitor='val_acc',
+                                 verbose=1,
+                                 save_best_only=True,
+                                 mode='max')
     model.fit(X_train, y_train,
               batch_size=args.batch_size,
               epochs=args.epochs,
               validation_data=(X_val, y_val),
-              callbacks=[early_stopping, checkpoint])    
+              callbacks=[early_stopping, checkpoint])
 
 if __name__ == "__main__":
     main()
