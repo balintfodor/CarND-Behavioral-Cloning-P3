@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 import keras
 from keras.models import Sequential, Model
 from keras.layers import Dense, Flatten, Lambda, Dropout, BatchNormalization, Cropping2D, Concatenate, Input, Conv2D, Activation
+from keras.initializers import TruncatedNormal
 from keras.optimizers import SGD, Adam
 from keras.applications.mobilenet import MobileNet
 from keras.applications.xception import Xception
@@ -149,17 +150,19 @@ def build_model(args):
 
     top = Flatten()(top)
 
-    top = Dense(256)(top)
+    dense_init = TruncatedNormal(stddev=0.01)
+
+    top = Dense(256, kernel_initializer=dense_init)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
     top = Dropout(args.dropout)(top)
 
-    top = Dense(64)(top)
+    top = Dense(64, kernel_initializer=dense_init)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
 
-    top = Dense(1)(top)
-    top = Activation('sigmoid')(top)
+    top = Dense(1, kernel_initializer=dense_init)(top)
+    top = Activation('tanh')(top)
     predictions = top
 
     model = Model(inputs=inputs, outputs=predictions)
