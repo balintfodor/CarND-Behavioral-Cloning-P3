@@ -196,7 +196,7 @@ def main():
                                  monitor='val_loss',
                                  verbose=1,
                                  save_best_only=True,
-                                 mode='max')
+                                 mode='min')
     model.fit(X_train, y_train,
               batch_size=args.batch_size,
               epochs=args.epochs,
