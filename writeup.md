@@ -184,4 +184,4 @@ Driving each of the two levels I collected a clockwise full lap, a counter-clock
 
 `model.py` expects a root dir path that it scans for csv files recursively. The csv files are loaded along with the images referred in them. Steering field is additively generated for the left and right images using the steering value for the center images and the `steering_compensation` parameter.
 
-All the images are duplicated and flipped horizontally with their steering values inverted. The whole dataset is shuffled, then a 30% of the data is stored as the validation data, the rest of them is the training data. It means 33520 samples for training and 14366 samples for validation.
+All the images are duplicated and flipped horizontally with their steering values inverted. The whole dataset is shuffled, then a 30% of the data is stored as the validation data, the rest of them is the training data. It means 33520 samples for training and 14366 samples for validation. For testing I was using the simulator.
