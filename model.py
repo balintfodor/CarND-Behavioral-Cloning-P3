@@ -30,6 +30,8 @@ def parse_args():
     parser.add_argument('--steering_compensation', type=float, nargs='?', default=0.2)
     parser.add_argument('--seed', type=int, nargs='?', default=42)
     parser.add_argument('--dropout', type=float, nargs='?', default=0.2)
+    parser.add_argument('--init_stddev', type=float, nargs='?', default=0.01)
+    parser.add_argument('--width_multiplier', type=int, nargs='?', default=1)
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--plot_model', action='store_true')
     return parser.parse_args()
@@ -143,25 +145,26 @@ def build_model(args):
     top = merged_conv
     top = Dropout(args.dropout)(top)
 
-    top = Conv2D(filters=256, kernel_size=(1, 1))(top)
+    trunc_init = TruncatedNormal(stddev=args.init_stddev)
+    width_multiplier = args.width_multiplier
+
+    top = Conv2D(filters=256, kernel_size=(1, 1), kernel_initializer=trunc_init)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
     top = Dropout(args.dropout)(top)
 
     top = Flatten()(top)
 
-    dense_init = TruncatedNormal(stddev=0.01)
-
-    top = Dense(256, kernel_initializer=dense_init)(top)
+    top = Dense(256 * width_multiplier, kernel_initializer=trunc_init)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
     top = Dropout(args.dropout)(top)
 
-    top = Dense(64, kernel_initializer=dense_init)(top)
+    top = Dense(64 * width_multiplier, kernel_initializer=trunc_init)(top)
     top = BatchNormalization()(top)
     top = Activation('relu')(top)
 
-    top = Dense(1, kernel_initializer=dense_init)(top)
+    top = Dense(1, kernel_initializer=trunc_init)(top)
     top = Activation('tanh')(top)
     predictions = top
 
@@ -190,7 +193,7 @@ def main():
     model = build_model(args)
     early_stopping = EarlyStopping(monitor='val_loss', patience=3)
     checkpoint = ModelCheckpoint(args.out,
-                                 monitor='val_acc',
+                                 monitor='val_loss',
                                  verbose=1,
                                  save_best_only=True,
                                  mode='max')
