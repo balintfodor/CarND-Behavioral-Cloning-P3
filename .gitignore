@@ -147,4 +147,5 @@ pip-selfcheck.json
 
 # End of https://www.gitignore.io/api/osx,python,virtualenv
 virtualenv
-models
+mobilenet_1_0_160_tf_no_top.h5
+.vscode/

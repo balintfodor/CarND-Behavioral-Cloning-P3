@@ -22,18 +22,30 @@ SPEED_DIVIDER = 30.0
 def parse_args():
     '''arg parsing'''
     parser = argparse.ArgumentParser(description='Behavioral Cloning')
-    parser.add_argument('search_path', type=str)
-    parser.add_argument('--out', type=str, nargs='?', default='model.h5')
-    parser.add_argument('--learning_rate', type=float, nargs='?', default=0.01)
-    parser.add_argument('--batch_size', type=int, nargs='?', default=256)
-    parser.add_argument('--epochs', type=int, nargs='?', default=100)
-    parser.add_argument('--steering_compensation', type=float, nargs='?', default=0.2)
-    parser.add_argument('--seed', type=int, nargs='?', default=42)
-    parser.add_argument('--dropout', type=float, nargs='?', default=0.2)
-    parser.add_argument('--init_stddev', type=float, nargs='?', default=0.01)
-    parser.add_argument('--width_multiplier', type=int, nargs='?', default=1)
-    parser.add_argument('--test', action='store_true')
-    parser.add_argument('--plot_model', action='store_true')
+    parser.add_argument('search_path', type=str,
+        help='root folder to search for csv files recursively')
+    parser.add_argument('--out', type=str, nargs='?', default='model.h5',
+        help='output model file name')
+    parser.add_argument('--learning_rate', type=float, nargs='?', default=0.01,
+        help='learning rate for the training')
+    parser.add_argument('--batch_size', type=int, nargs='?', default=256,
+        help='batch size for the training')
+    parser.add_argument('--epochs', type=int, nargs='?', default=100,
+        help='maximum number of epochs')
+    parser.add_argument('--steering_compensation', type=float, nargs='?', default=0.2,
+        help='steering compensation value for the left and right images in the dataset')
+    parser.add_argument('--seed', type=int, nargs='?', default=42,
+        help='random seed')
+    parser.add_argument('--dropout', type=float, nargs='?', default=0.2,
+        help='dropout factor for the top layers')
+    parser.add_argument('--init_stddev', type=float, nargs='?', default=0.01,
+        help='initial trunc normal stddev for the top layers')
+    parser.add_argument('--width_multiplier', type=int, nargs='?', default=1,
+        help='width multiplier for the top layers')
+    parser.add_argument('--test', action='store_true',
+        help='limits the number of csv rows to process for getting over the data processing quickly')
+    parser.add_argument('--plot_model', action='store_true',
+        help='draw model.png shoing the architecture')
     return parser.parse_args()
 
 def find_csv_files(search_path):
@@ -99,7 +111,7 @@ def append_mirrored_data(data_x, data_y):
     return np.vstack((data_x, mirrored_data_x)), np.vstack((data_y, mirrored_data_y))
 
 def build_simple_model(args):
-    '''builds a basic model for test functionality'''
+    '''builds a basic model for test the functionality and help find bugs'''
     model = Sequential()
     model.add(Lambda(lambda x: 1.0/255.0 * x, input_shape=(160, 320, 3)))
     model.add(Flatten())
@@ -110,6 +122,7 @@ def build_simple_model(args):
     return model
 
 def scale_image(x):
+    '''scales the image values to the range [0, 1]'''
     import tensorflow as tf
     IMAGE_SCALE_FACTOR = 1.0 / 255.0
     return x * IMAGE_SCALE_FACTOR
@@ -119,16 +132,14 @@ def build_model(args):
     inputs = Input(shape=(160, 320, 3))
     inputs_scaled = Lambda(scale_image)(inputs)
 
-    # sub_input_1 = Cropping2D(cropping=((0, 0), (0, 160)))(inputs_scaled)
-    # sub_input_2 = Cropping2D(cropping=((0, 0), (160, 0)))(inputs_scaled)
-
     sub_input_1 = Cropping2D(cropping=((60, 20), (0, 160)))(inputs_scaled)
     sub_input_2 = Cropping2D(cropping=((60, 20), (160, 0)))(inputs_scaled)
 
     merged_sub_inputs = keras.layers.concatenate([sub_input_1, sub_input_2], axis=1)
 
     # highly discouraged, but I had an SSL verification error
-    # when tried to download the keras.application model
+    # when tried to download the keras.application model; to overcome
+    # this problem I switched off ssl verification:
     # import ssl
     # ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -136,10 +147,6 @@ def build_model(args):
     for layer in conv_model.layers:
         layer.trainable = False
 
-    # conv_out_1 = conv_model(sub_input_1)
-    # conv_out_2 = conv_model(sub_input_2)
-
-    # merged_conv = keras.layers.concatenate([conv_out_1, conv_out_2], axis=2)
     merged_conv = conv_model(merged_sub_inputs)
 
     top = merged_conv
